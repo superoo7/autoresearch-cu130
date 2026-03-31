@@ -23,11 +23,9 @@ RUN git clone -b v0.0.33 --depth=1 https://github.com/facebookresearch/xformers 
     python setup.py install && \
     cd ..
 
-# Install unsloth and other dependencies
+# Install unsloth and dependencies (latest versions for Qwen3.5 support)
 RUN pip install --no-deps bitsandbytes==0.48.0
-RUN pip install unsloth unsloth_zoo
-# Upgrade transformers for Qwen3.5 support (requires >=5.2.0)
-RUN pip install --upgrade "transformers>=5.2.0" "trl>=0.18.0"
+RUN pip install --upgrade --force-reinstall --no-cache-dir unsloth unsloth_zoo
 
 # Launch the shell
 CMD ["/bin/bash"]

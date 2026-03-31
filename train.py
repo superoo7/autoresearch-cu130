@@ -10,13 +10,13 @@ Usage: python train.py
 
 # Model
 MODEL_NAME = "unsloth/Qwen3.5-4B"        # Base model from HuggingFace
-MAX_SEQ_LENGTH = 4096                     # Max tokens per example. 1024/2048/4096/8192
-LOAD_IN_4BIT = True                       # 4-bit quantization (saves VRAM, slight quality loss)
-OFFLOAD_EMBEDDING = False                 # Not needed for 4B model
+MAX_SEQ_LENGTH = 2048                     # Max tokens per example. 1024/2048/4096/8192
+LOAD_IN_4BIT = False                      # DO NOT use 4-bit QLoRA on Qwen3.5 (BitsandBytes issue)
+LOAD_IN_16BIT = True                      # Use bf16 instead (~10GB VRAM for 4B model)
 
 # LoRA
 LORA_RANK = 16                            # LoRA rank. Higher = more capacity. Try 4/8/16/32/64
-LORA_ALPHA = 32                           # Scaling factor. 2x rank is a good default
+LORA_ALPHA = 16                           # Scaling factor. Unsloth docs recommend alpha = rank for Qwen3.5
 LORA_TARGET_MODULES = [                   # Layers to apply LoRA to
     "q_proj", "k_proj", "v_proj", "o_proj",
     "gate_proj", "up_proj", "down_proj",
@@ -117,7 +117,8 @@ model, tokenizer = FastLanguageModel.from_pretrained(
     model_name=MODEL_NAME,
     max_seq_length=MAX_SEQ_LENGTH,
     load_in_4bit=LOAD_IN_4BIT,
-    offload_embedding=OFFLOAD_EMBEDDING,
+    load_in_16bit=LOAD_IN_16BIT,
+    full_finetuning=False,
 )
 
 print("Applying LoRA...")
