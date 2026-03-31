@@ -1,6 +1,6 @@
 """
 Autoresearch finetuning script. Single-GPU, single-file.
-SFT finetune GPT-OSS 20B with LoRA using Unsloth on DGX Spark.
+SFT finetune with LoRA using Unsloth on DGX Spark.
 Usage: python train.py
 """
 
@@ -9,10 +9,10 @@ Usage: python train.py
 # ============================================================
 
 # Model
-MODEL_NAME = "unsloth/gpt-oss-20b"       # Base model from HuggingFace
+MODEL_NAME = "unsloth/Qwen3.5-4B"        # Base model from HuggingFace
 MAX_SEQ_LENGTH = 4096                     # Max tokens per example. 1024/2048/4096/8192
 LOAD_IN_4BIT = True                       # 4-bit quantization (saves VRAM, slight quality loss)
-OFFLOAD_EMBEDDING = True                  # Offload embeddings to CPU (saves ~1GB VRAM)
+OFFLOAD_EMBEDDING = False                 # Not needed for 4B model
 
 # LoRA
 LORA_RANK = 16                            # LoRA rank. Higher = more capacity. Try 4/8/16/32/64
@@ -45,7 +45,7 @@ OUTPUT_DIR = "outputs"                    # Checkpoints and adapters
 # Completion-only training — only compute loss on assistant response, not user/system tokens
 # This matches the approach from Jackrong/Qwopus3.5-9B-v3 (masked on assistant response)
 COMPLETION_ONLY = True                    # True = train only on assistant response
-RESPONSE_TEMPLATE = "<|start|>assistant<|message|>"  # Token sequence that starts the assistant response
+RESPONSE_TEMPLATE = "<|im_start|>assistant\n"  # Token sequence that starts the assistant response
 
 # Inference test prompts
 TEST_PROMPTS = [

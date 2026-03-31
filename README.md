@@ -1,12 +1,14 @@
 # autoresearch-cu130
 
-Autonomous SFT finetuning research for GPT-OSS 20B on DGX Spark (NVIDIA GB10, CUDA 13.0).
+Autonomous SFT finetuning research for Qwen3.5-4B on DGX Spark (NVIDIA GB10, CUDA 13.0).
 
 Fork of [karpathy/autoresearch](https://github.com/karpathy/autoresearch), adapted from pre-training to **finetuning** with [Unsloth](https://github.com/unslothai/unsloth) + LoRA.
 
 ## What this does
 
-An AI agent autonomously finetunes GPT-OSS 20B to improve its reasoning ability. It modifies `train.py` (LoRA config, hyperparameters, dataset filtering), runs training, evaluates the result using **two metrics**, keeps improvements or discards failures, and repeats — all without human intervention.
+An AI agent autonomously finetunes [Qwen3.5-4B](https://huggingface.co/Qwen/Qwen3.5-4B) to improve its reasoning ability. It modifies `train.py` (LoRA config, hyperparameters, dataset filtering), runs training, evaluates the result using **two metrics**, keeps improvements or discards failures, and repeats — all without human intervention.
+
+Training uses **completion-only masking** — loss is only computed on the assistant response (from `<|im_start|>assistant` onward), so the model focuses on learning reasoning + answer generation, not predicting user prompts.
 
 - **`prepare.py`** — one-time dataset download and preparation. Protected from agent modification.
 - **`train.py`** — the single file the agent edits. All config, training, evaluation, and logging.
