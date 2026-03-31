@@ -51,12 +51,41 @@ TEST_PROMPTS = [
 MAX_NEW_TOKENS = 512
 TEMPERATURE = 0.7
 
+# Output quality checklist — binary yes/no checks on generated outputs
+# These act as a quality gate: keep a change only if checklist >= CHECKLIST_PASS_THRESHOLD
+CHECKLIST = [
+    {
+        "name": "uses_think_tags",
+        "question": "Does the response contain <think> and </think> tags?",
+        "check": lambda text: "<think>" in text and "</think>" in text,
+    },
+    {
+        "name": "step_by_step_reasoning",
+        "question": "Does the thinking section show step-by-step breakdown?",
+        "check": lambda text: (
+            "<think>" in text and
+            any(marker in text.lower() for marker in
+                ["step ", "first", "then", "next", "finally", "1.", "2.", "1)", "2)"])
+        ),
+    },
+    {
+        "name": "answer_outside_tags",
+        "question": "Is there a clear answer after the </think> closing tag?",
+        "check": lambda text: (
+            "</think>" in text and
+            len(text.split("</think>", 1)[-1].strip()) > 10
+        ),
+    },
+]
+CHECKLIST_PASS_THRESHOLD = 0.6            # Quality gate: revert if below this
+
 # ============================================================
 # IMPORTS + SETUP
 # ============================================================
 
 import math
 import os
+import re
 import time
 import csv
 from datetime import datetime
@@ -184,9 +213,10 @@ print()
 # ============================================================
 
 print("=" * 60)
-print("INFERENCE TEST")
+print("INFERENCE TEST + CHECKLIST SCORING")
 print("=" * 60)
 
+responses = []
 for i, prompt in enumerate(TEST_PROMPTS):
     text = tokenizer.apply_chat_template(
         [{"role": "user", "content": prompt}],
@@ -202,11 +232,32 @@ for i, prompt in enumerate(TEST_PROMPTS):
             do_sample=True,
         )
     response = tokenizer.decode(output[0][inputs.input_ids.shape[1]:], skip_special_tokens=True)
+    responses.append(response)
     print(f"\n--- Prompt {i+1}: {prompt}")
     print(f"--- Response:\n{response[:1000]}")
     if len(response) > 1000:
         print(f"... (truncated, {len(response)} chars total)")
 
+# Score outputs against checklist
+print("\n" + "=" * 60)
+print("CHECKLIST RESULTS")
+print("=" * 60)
+
+total_checks = 0
+total_passed = 0
+for i, response in enumerate(responses):
+    print(f"\nPrompt {i+1}:")
+    for item in CHECKLIST:
+        passed = item["check"](response)
+        total_checks += 1
+        total_passed += int(passed)
+        status = "PASS" if passed else "FAIL"
+        print(f"  [{status}] {item['name']}: {item['question']}")
+
+checklist_score = total_passed / total_checks if total_checks > 0 else 0.0
+print(f"\nChecklist: {total_passed}/{total_checks} ({checklist_score:.0%})")
+if checklist_score < CHECKLIST_PASS_THRESHOLD:
+    print(f"WARNING: Below quality gate threshold ({CHECKLIST_PASS_THRESHOLD:.0%})")
 print()
 
 # ============================================================
@@ -218,6 +269,8 @@ print("---")
 print(f"eval_loss:        {eval_loss:.6f}")
 print(f"perplexity:       {perplexity:.4f}")
 print(f"train_loss:       {train_loss:.6f}")
+print(f"checklist_score:  {checklist_score:.2f}")
+print(f"checklist_detail: {total_passed}/{total_checks}")
 print(f"peak_vram_mb:     {peak_vram_mb:.1f}")
 print(f"train_time_min:   {train_time/60:.1f}")
 print(f"dataset_rows:     {len(train_dataset)}")
@@ -232,9 +285,9 @@ print(f"grad_accum:       {GRADIENT_ACCUMULATION}")
 # Append to results.tsv
 results_file = "results.tsv"
 header = ["timestamp", "run_name", "eval_loss", "perplexity", "train_loss",
-          "peak_vram_mb", "train_time_min", "lora_rank", "lora_alpha",
-          "learning_rate", "num_epochs", "seq_length", "batch_size",
-          "grad_accum", "dataset_rows"]
+          "checklist_score", "peak_vram_mb", "train_time_min", "lora_rank",
+          "lora_alpha", "learning_rate", "num_epochs", "seq_length",
+          "batch_size", "grad_accum", "dataset_rows"]
 
 write_header = not os.path.exists(results_file)
 with open(results_file, "a", newline="") as f:
@@ -247,6 +300,7 @@ with open(results_file, "a", newline="") as f:
         f"{eval_loss:.6f}",
         f"{perplexity:.4f}",
         f"{train_loss:.6f}",
+        f"{checklist_score:.2f}",
         f"{peak_vram_mb:.1f}",
         f"{train_time/60:.1f}",
         LORA_RANK,

@@ -111,13 +111,30 @@ Read the latest results: `tail -5 results.tsv`
 LOOP FOREVER:
 
 1. Look at the git state: the current branch/commit we're on
-2. Modify the CONFIG section of `train.py` with an experimental idea
-3. git commit
-4. Run: `python train.py > run.log 2>&1`
-5. Read results: `grep "^eval_loss:\|^perplexity:" run.log`
-6. If the grep output is empty, the run crashed. Run `tail -n 50 run.log` to read the traceback.
-7. If eval_loss improved (lower), keep the commit
-8. If eval_loss is equal or worse, `git reset --hard HEAD~1` to revert
+2. **Analyze failures first.** Read the CHECKLIST RESULTS and INFERENCE TEST outputs from the last run.log. Which checklist items fail? What do the failing outputs look like? Form a hypothesis before changing anything.
+3. **Change ONE thing** in the CONFIG section of `train.py`. Never change multiple hyperparams at once — you won't know what helped.
+4. git commit with a message describing what you changed and why
+5. Run: `python train.py > run.log 2>&1`
+6. Read results: `grep "^eval_loss:\|^checklist_score:" run.log`
+7. If the grep output is empty, the run crashed. Run `tail -n 50 run.log` to read the traceback.
+8. **Keep or revert:**
+   - eval_loss improved AND checklist_score >= 0.60 → **KEEP**
+   - eval_loss improved BUT checklist_score < 0.60 → **REVERT** (quality gate failed)
+   - eval_loss same or worse → **REVERT** via `git reset --hard HEAD~1`
+9. **Log to changelog.md**: Append what you changed, why, and what happened (see format below)
+10. Repeat from step 1
+
+**Changelog format** (append after each experiment):
+```markdown
+## Experiment [N] — [keep/discard]
+**eval_loss:** [X.XXXX] | **checklist:** [X.XX] | **Change:** [one sentence]
+**Reasoning:** [why you expected this to help]
+**Result:** [what actually happened]
+```
+
+**Baseline first**: The very first run must be the unchanged config. This establishes the baseline.
+
+**Ceiling detection**: If checklist_score hits 1.00 for 3 consecutive runs, focus purely on eval_loss.
 
 **Crashes**: If a run crashes, check if it's a simple fix (typo, OOM). For OOM, reduce MAX_SEQ_LENGTH or BATCH_SIZE. If fundamentally broken, revert and try something else.
 
