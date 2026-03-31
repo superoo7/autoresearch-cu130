@@ -158,71 +158,34 @@ autoresearch-cu130/
 
 ## TODO
 
-### Phase 1: Setup
-- [x] Copy datasets from `/media/johnson_ssd/finetune-setup/datasets/` to repo
-- [x] Copy `Dockerfile` from `/media/johnson_ssd/finetune-setup/Dockerfile`
-- [x] Update `.gitignore` for finetuning workflow
-- [x] Remove files not needed: `pyproject.toml`, `uv.lock`, `.python-version`, `analysis.ipynb`, `progress.png`
+### Phase 1: Setup — DONE
+- [x] Copy datasets to repo (symlinked)
+- [x] Copy `Dockerfile`
+- [x] Update `.gitignore`
+- [x] Remove unneeded files (`pyproject.toml`, `uv.lock`, `.python-version`, etc.)
 
-### Phase 2: Core Scripts
-- [x] Write `prepare.py` — dataset download + unification (from existing `prepare_datasets.py`)
-- [x] Write `train.py` — the main script with sections:
-  - [x] Section 1: CONFIG (all hyperparams as top-level constants)
-  - [x] Section 2: IMPORTS + SETUP (timing, run name)
-  - [x] Section 3: LOAD MODEL (FastLanguageModel + LoRA)
-  - [x] Section 4: DATASET (load, format to text, filter, split)
-  - [x] Section 5: TRAIN (SFTTrainer)
-  - [x] Section 6: EVALUATE (eval_loss, perplexity)
-  - [x] Section 7: INFERENCE TEST (3 prompts, decoded output)
-  - [x] Section 8: RESULTS SUMMARY + LOG (print block + append results.tsv)
-  - [x] Section 9: SAVE (LoRA adapter)
-- [ ] Add output quality checklist scoring to train.py (Section 6b):
-  - [ ] Define CHECKLIST questions in CONFIG
-  - [ ] After inference, score each output against checklist (yes/no per item)
-  - [ ] Compute checklist_score = % passed across all prompts
-  - [ ] Print `checklist_score:` in summary block
-  - [ ] Log checklist_score to results.tsv
+### Phase 2: Core Scripts — DONE
+- [x] Write `prepare.py` — dataset download + unification
+- [x] Write `train.py` — CONFIG, model loading, dataset prep, training, eval, inference, results logging, save
+- [x] Add checklist scoring to train.py (3 binary evals: think tags, step-by-step, answer outside tags)
+- [x] Add `checklist_score` to summary block and results.tsv
+- [x] Add quality gate threshold (CHECKLIST_PASS_THRESHOLD = 0.6)
 
-### Phase 3: Documentation
-- [x] Write `program.md` — agent instructions (setup, loop, research directions, rules)
-- [x] Write `README.md` — overview, quick start, structure
+### Phase 3: Documentation — DONE
+- [x] Write `program.md` — agent loop with checklist rules, failure analysis, one-change-at-a-time, changelog format, baseline-first, ceiling detection
+- [x] Write `README.md`
 - [x] Move old notebooks to `archive/`
-- [ ] Update `program.md` with checklist scoring rules for the agent loop
+- [x] Copy `eval-guide.md` to `references/`
+- [x] Archive autoresearch skill zip to `archive/autoresearch-skill/`
 
-### Phase 4: Test
-- [ ] Run `python prepare.py` inside Docker — verify datasets created
-- [x] Run `python train.py > run.log 2>&1` inside Docker — verify end-to-end (running now)
-- [ ] Verify `results.tsv` has one row appended
+### Phase 4: Test — IN PROGRESS
+- [x] Run `python train.py > run.log 2>&1` inside Docker (running now, ~16% epoch 1)
+- [ ] Verify `results.tsv` has one row appended after run completes
 - [ ] Verify `outputs/lora_adapter/` exists
 - [ ] Verify parseable output: `grep "^eval_loss:\|^checklist_score:" run.log`
-- [ ] Verify agent can extract metrics and make keep/discard decisions
-
-### Phase 5: Checklist Scoring (from autoresearch skill pattern)
-- [ ] Add CHECKLIST config to train.py CONFIG section:
-  - [ ] Define 5 binary yes/no eval questions for reasoning output quality
-  - [ ] Add `CHECKLIST_PASS_THRESHOLD = 0.6` (quality gate)
-- [ ] Add `score_output()` function to train.py:
-  - [ ] Takes generated text, returns dict of {eval_name: True/False}
-  - [ ] Uses simple string/pattern checks (no LLM judge needed for v1)
-  - [ ] e.g. check for `<think>` tags, step-by-step markers, answer outside tags
-- [ ] Add Section 6b to train.py: score all test prompt outputs against checklist
-- [ ] Print `checklist_score:` in summary block
-- [ ] Add `checklist_score` column to results.tsv
-- [ ] Create `changelog.md` template — train.py appends after each run
-
-### Phase 6: Agent Loop Refinements
-- [ ] Update `program.md` with:
-  - [ ] Checklist scoring rules (keep only if eval_loss improved AND checklist >= 60%)
-  - [ ] Failure analysis step (read failing outputs before choosing next experiment)
-  - [ ] Changelog writing rules (append to changelog.md after each experiment)
-  - [ ] Ceiling detection (stop at 95%+ checklist for 3 consecutive runs)
-  - [ ] One-change-at-a-time rule (explicit)
-- [ ] Copy `eval-guide.md` to `references/` for agent reference
-- [ ] Add baseline-first rule to program.md (run unchanged config first)
-
-### Phase 7: Polish & Ship
-- [ ] Copy autoresearch skill zip to `archive/autoresearch-skill/` for reference
-- [ ] Commit all changes on `feature/unsloth-finetune` branch
-- [ ] Push to `fork` remote (`superoo7/autoresearch-cu130`)
-- [ ] Wait for Phase 4 test run to complete, verify results
+- [ ] Verify checklist PASS/FAIL output is sensible
 - [ ] Fix any issues found during test run
+
+### Phase 5: Remaining
+- [ ] Create `changelog.md` template (agent appends after each experiment)
+- [ ] Final commit + push after test run passes

@@ -2,17 +2,41 @@
 
 Autonomous SFT finetuning research for GPT-OSS 20B on DGX Spark (NVIDIA GB10, CUDA 13.0).
 
-Fork of [karpathy/autoresearch](https://github.com/karpathy/autoresearch), adapted from pre-training to finetuning with [Unsloth](https://github.com/unslothai/unsloth) + LoRA.
+Fork of [karpathy/autoresearch](https://github.com/karpathy/autoresearch), adapted from pre-training to **finetuning** with [Unsloth](https://github.com/unslothai/unsloth) + LoRA.
 
-## How it works
+## What this does
 
-An AI agent modifies `train.py` (LoRA config, hyperparameters, dataset filtering), runs finetuning, checks `eval_loss`, keeps improvements or discards failures, and repeats autonomously.
+An AI agent autonomously finetunes GPT-OSS 20B to improve its reasoning ability. It modifies `train.py` (LoRA config, hyperparameters, dataset filtering), runs training, evaluates the result using **two metrics**, keeps improvements or discards failures, and repeats — all without human intervention.
 
-- **`prepare.py`** — one-time dataset download and preparation. Not modified by agents.
-- **`train.py`** — the single file the agent edits. Config, training, evaluation, logging.
+- **`prepare.py`** — one-time dataset download and preparation. Protected from agent modification.
+- **`train.py`** — the single file the agent edits. All config, training, evaluation, and logging.
 - **`program.md`** — instructions for the agent. Edited by humans.
 
-The metric is **eval_loss** (cross-entropy on held-out eval split) — lower is better.
+## How evaluation works
+
+**Layer 1: eval_loss** — cross-entropy on a 5% held-out eval split. Lower is better. Fast, quantitative.
+
+**Layer 2: checklist scoring** — after training, the model generates answers to test prompts. Each output is scored against binary yes/no checks:
+
+| Check | What it catches |
+|---|---|
+| Uses `<think>` tags? | Models that skip chain-of-thought |
+| Step-by-step reasoning inside thinking? | Shallow reasoning that just restates the question |
+| Clear answer outside `</think>` tags? | Models that bury the answer in reasoning |
+
+The agent keeps a change only if eval_loss improved **AND** checklist score stays above 60%.
+
+## Dataset
+
+Dataset pulled from [Jackrong/Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled](https://huggingface.co/Jackrong/Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled). 3,209 high-quality reasoning distillation examples from 3 sources:
+
+| Dataset | Rows | Purpose |
+|---|---|---|
+| [nohurry/Opus-4.6-Reasoning-3000x-filtered](https://huggingface.co/datasets/nohurry/Opus-4.6-Reasoning-3000x-filtered) | 2,326 | Comprehensive Claude 4.6 Opus reasoning trajectories |
+| [TeichAI/claude-4.5-opus-high-reasoning-250x](https://huggingface.co/datasets/TeichAI/claude-4.5-opus-high-reasoning-250x) | 250 | High-intensity structured reasoning instances |
+| [Jackrong/Qwen3.5-reasoning-700x](https://huggingface.co/datasets/Jackrong/Qwen3.5-reasoning-700x) | 633 | Curated samples for step-by-step problem solving and reasoning diversity |
+
+All datasets are unified into a single chat format with `<think>...</think>` tags for chain-of-thought reasoning by `prepare.py`.
 
 ## Quick start
 
@@ -28,33 +52,29 @@ python prepare.py
 
 # Run a single training experiment
 python train.py 2>&1 | tee run.log
+
+# Check results
+grep "^eval_loss:\|^checklist_score:" run.log
 ```
 
 ## Running the agent
 
-Spin up Claude Code or similar in this repo, then prompt:
+Spin up Claude Code (or similar) in this repo, then prompt:
 
 ```
 Hi have a look at program.md and let's kick off a new experiment!
 ```
 
-## Dataset
-
-3,209 curated reasoning examples from 3 sources:
-
-| Source | Rows | Description |
-|---|---|---|
-| Opus-4.6-Reasoning-3000x-filtered | 2,326 | Math/code reasoning with chain-of-thought |
-| claude-4.5-opus-high-reasoning-250x | 250 | High-quality coding with deep reasoning |
-| Qwen3.5-reasoning-700x | 633 | Math reasoning traces |
+The agent will establish a baseline, then loop autonomously: modify config, train, evaluate, keep/revert, repeat. See `program.md` for the full protocol.
 
 ## Project structure
 
 ```
 prepare.py      — dataset download + preparation (do not modify)
 train.py        — LoRA config, training, evaluation (agent modifies this)
-program.md      — agent instructions
-Dockerfile      — Docker image build
+program.md      — agent instructions + experiment loop protocol
+references/     — eval-guide.md for writing good binary evals
+Dockerfile      — Docker image build (unsloth-dgx-spark)
 ```
 
 ## Hardware
