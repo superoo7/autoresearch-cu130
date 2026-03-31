@@ -90,7 +90,6 @@ CHECKLIST_PASS_THRESHOLD = 0.6            # Quality gate: revert if below this
 
 import math
 import os
-import re
 import time
 import csv
 from datetime import datetime
@@ -146,8 +145,29 @@ dataset = load_from_disk(DATASET_PATH)
 print(f"Loaded: {len(dataset)} rows")
 
 # Format messages to text
+# Note: Qwen3/3.5 chat templates auto-insert <think> tags in the assistant response.
+# Our dataset already has <think>...</think> in the assistant content, so we strip them
+# to avoid double <think> tags. The template will re-add them.
+def strip_think_tags(content):
+    """Remove <think>...</think> wrapper, keep the inner reasoning + answer."""
+    import re
+    # Match <think>...reasoning...</think>\n\nanswer
+    match = re.match(r"<think>\s*(.*?)\s*</think>\s*(.*)", content, re.DOTALL)
+    if match:
+        thinking = match.group(1).strip()
+        answer = match.group(2).strip()
+        # Return thinking + answer without tags (template will wrap in <think>)
+        return thinking + "\n\n" + answer if answer else thinking
+    return content
+
 def to_text(example):
-    return {"text": tokenizer.apply_chat_template(example["messages"], tokenize=False)}
+    msgs = []
+    for m in example["messages"]:
+        if m["role"] == "assistant":
+            msgs.append({"role": "assistant", "content": strip_think_tags(m["content"])})
+        else:
+            msgs.append(m)
+    return {"text": tokenizer.apply_chat_template(msgs, tokenize=False)}
 
 dataset = dataset.map(to_text, num_proc=1)
 
