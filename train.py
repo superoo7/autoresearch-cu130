@@ -31,16 +31,21 @@ EVAL_SPLIT = 0.05                         # 5% for eval (higher = more stable me
 BATCH_SIZE = 1                            # Per-device batch size
 GRADIENT_ACCUMULATION = 4                 # Effective batch = BATCH_SIZE * GRADIENT_ACCUMULATION
 LEARNING_RATE = 2e-4                      # Peak LR. Try 5e-5 to 5e-4
-NUM_EPOCHS = 3                            # Passes over dataset. Watch for overfitting >3
-MAX_STEPS = -1                            # Override epochs with fixed steps (-1 = use epochs)
+NUM_EPOCHS = 1                            # Passes over dataset. Watch for overfitting >3
+MAX_STEPS = 300                           # Fixed step budget for fast iteration (~30 min on GB10). -1 = use epochs
 WARMUP_RATIO = 0.05                       # LR warmup fraction
 LR_SCHEDULER = "cosine"                   # "cosine", "linear", "constant"
 OPTIMIZER = "adamw_8bit"                  # adamw_8bit saves VRAM vs adamw_torch
 WEIGHT_DECAY = 0.01                       # L2 regularization
 LOGGING_STEPS = 10                        # Log every N steps
 EVAL_STEPS = 100                          # Evaluate every N steps
-SAVE_STEPS = 200                          # Checkpoint every N steps
+SAVE_STEPS = 300                          # Checkpoint at end of run
 OUTPUT_DIR = "outputs"                    # Checkpoints and adapters
+
+# Completion-only training — only compute loss on assistant response, not user/system tokens
+# This matches the approach from Jackrong/Qwopus3.5-9B-v3 (masked on assistant response)
+COMPLETION_ONLY = True                    # True = train only on assistant response
+RESPONSE_TEMPLATE = "<|start|>assistant<|message|>"  # Token sequence that starts the assistant response
 
 # Inference test prompts
 TEST_PROMPTS = [
@@ -95,7 +100,8 @@ from unsloth import FastLanguageModel
 from datasets import load_from_disk
 from trl import SFTConfig, SFTTrainer
 
-run_name = f"r{LORA_RANK}_a{LORA_ALPHA}_lr{LEARNING_RATE}_ep{NUM_EPOCHS}_seq{MAX_SEQ_LENGTH}"
+steps_label = f"s{MAX_STEPS}" if MAX_STEPS > 0 else f"ep{NUM_EPOCHS}"
+run_name = f"r{LORA_RANK}_a{LORA_ALPHA}_lr{LEARNING_RATE}_{steps_label}_seq{MAX_SEQ_LENGTH}"
 start_time = time.time()
 
 print(f"=== RUN: {run_name} ===")
@@ -162,11 +168,24 @@ print()
 # ============================================================
 
 print("Setting up trainer...")
+
+# Completion-only: only compute loss on the assistant response tokens
+data_collator = None
+if COMPLETION_ONLY:
+    from trl import DataCollatorForCompletionOnlyLM
+    response_token_ids = tokenizer.encode(RESPONSE_TEMPLATE, add_special_tokens=False)
+    data_collator = DataCollatorForCompletionOnlyLM(
+        response_template=response_token_ids,
+        tokenizer=tokenizer,
+    )
+    print(f"Completion-only training: masking loss before '{RESPONSE_TEMPLATE}'")
+
 trainer = SFTTrainer(
     model=model,
     processing_class=tokenizer,
     train_dataset=train_dataset,
     eval_dataset=eval_dataset,
+    data_collator=data_collator,
     args=SFTConfig(
         per_device_train_batch_size=BATCH_SIZE,
         gradient_accumulation_steps=GRADIENT_ACCUMULATION,
@@ -277,10 +296,12 @@ print(f"dataset_rows:     {len(train_dataset)}")
 print(f"lora_rank:        {LORA_RANK}")
 print(f"lora_alpha:       {LORA_ALPHA}")
 print(f"learning_rate:    {LEARNING_RATE}")
+print(f"max_steps:        {MAX_STEPS}")
 print(f"num_epochs:       {NUM_EPOCHS}")
 print(f"seq_length:       {MAX_SEQ_LENGTH}")
 print(f"batch_size:       {BATCH_SIZE}")
 print(f"grad_accum:       {GRADIENT_ACCUMULATION}")
+print(f"completion_only:  {COMPLETION_ONLY}")
 
 # Append to results.tsv
 results_file = "results.tsv"

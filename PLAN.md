@@ -187,5 +187,17 @@ autoresearch-cu130/
 - [ ] Fix any issues found during test run
 
 ### Phase 5: Remaining
+- [ ] Add completion-only loss masking (critical for quality):
+  - Response-only training masked on `<|im_start|>assistant\n<think>` (same as Jackrong's Qwopus3.5 approach)
+  - Use `DataCollatorForCompletionOnlyLM` with the assistant response token as the delimiter
+  - This ensures gradients focus on reasoning + answer, not on predicting user prompts
+  - Reference: https://huggingface.co/Jackrong/Qwopus3.5-9B-v3-GGUF
+- [ ] Consider BF16 instead of 4-bit for training quality (Qwopus3.5 used BF16)
+  - Trade-off: more VRAM but potentially better results
+  - On DGX Spark 128GB unified memory, BF16 20B model (~40GB) should fit
+- [ ] Add evaluation benchmarks (future):
+  - HumanEval pass@1 for code reasoning
+  - MMLU-Pro for general reasoning
+  - Measure avg think length (shorter reasoning = more efficient)
 - [ ] Create `changelog.md` template (agent appends after each experiment)
 - [ ] Final commit + push after test run passes

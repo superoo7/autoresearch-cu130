@@ -20,7 +20,9 @@ Once you get confirmation, kick off the experimentation.
 
 ## Experimentation
 
-Each experiment finetunes GPT-OSS 20B with LoRA on 3,209 curated reasoning examples. You launch it as: `python train.py > run.log 2>&1`
+Each experiment finetunes GPT-OSS 20B with LoRA on ~2,500 reasoning examples (after length filtering). Default: 300 steps (~30 min on GB10). Loss plateaus around step 100-200 so 300 steps is sufficient for comparing configs. You launch it as: `python train.py > run.log 2>&1`
+
+Training uses **completion-only masking** — loss is only computed on the assistant response (from `<|start|>assistant<|message|>` onward), not on user/system tokens. This focuses learning on reasoning + answer generation.
 
 **What you CAN do:**
 - Modify `train.py` — this is the only file you edit. The CONFIG section at the top has all hyperparameters: LoRA rank/alpha/targets, learning rate, epochs, batch size, sequence length, dataset filtering, etc.
