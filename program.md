@@ -1,6 +1,6 @@
 # autoresearch-cu130
 
-Autonomous SFT finetuning research for GPT-OSS 20B with LoRA on DGX Spark.
+Autonomous SFT finetuning research for Qwen3.5-4B with LoRA on DGX Spark.
 
 ## Setup
 
@@ -20,9 +20,9 @@ Once you get confirmation, kick off the experimentation.
 
 ## Experimentation
 
-Each experiment finetunes GPT-OSS 20B with LoRA on ~2,500 reasoning examples (after length filtering). Default: 300 steps (~30 min on GB10). Loss plateaus around step 100-200 so 300 steps is sufficient for comparing configs. You launch it as: `python train.py > run.log 2>&1`
+Each experiment finetunes Qwen3.5-4B with LoRA on ~5,100 reasoning examples (after length filtering). Default: 300 steps (~30 min on GB10). Loss plateaus around step 100-200 so 300 steps is sufficient for comparing configs. You launch it as: `.venv/bin/.venv/bin/python train.py > run.log 2>&1`
 
-Training uses **completion-only masking** — loss is only computed on the assistant response (from `<|start|>assistant<|message|>` onward), not on user/system tokens. This focuses learning on reasoning + answer generation.
+Training uses **completion-only masking** — loss is only computed on the assistant response, not on user/system tokens. This focuses learning on reasoning + answer generation.
 
 **What you CAN do:**
 - Modify `train.py` — this is the only file you edit. The CONFIG section at the top has all hyperparameters: LoRA rank/alpha/targets, learning rate, epochs, batch size, sequence length, dataset filtering, etc.
@@ -116,7 +116,7 @@ LOOP FOREVER:
 2. **Analyze failures first.** Read the CHECKLIST RESULTS and INFERENCE TEST outputs from the last run.log. Which checklist items fail? What do the failing outputs look like? Form a hypothesis before changing anything.
 3. **Change ONE thing** in the CONFIG section of `train.py`. Never change multiple hyperparams at once — you won't know what helped.
 4. git commit with a message describing what you changed and why
-5. Run: `python train.py > run.log 2>&1`
+5. Run: `.venv/bin/python train.py > run.log 2>&1`
 6. Read results: `grep "^eval_loss:\|^checklist_score:" run.log`
 7. If the grep output is empty, the run crashed. Run `tail -n 50 run.log` to read the traceback.
 8. **Keep or revert:**

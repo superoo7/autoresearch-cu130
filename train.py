@@ -33,19 +33,17 @@ GRADIENT_ACCUMULATION = 4                 # Effective batch = BATCH_SIZE * GRADI
 LEARNING_RATE = 2e-4                      # Peak LR. Try 5e-5 to 5e-4
 NUM_EPOCHS = 1                            # Passes over dataset. Watch for overfitting >3
 MAX_STEPS = 300                           # Fixed step budget for fast iteration (~30 min on GB10). -1 = use epochs
-WARMUP_RATIO = 0.05                       # LR warmup fraction
+WARMUP_STEPS = 10                         # LR warmup steps
 LR_SCHEDULER = "cosine"                   # "cosine", "linear", "constant"
 OPTIMIZER = "adamw_8bit"                  # adamw_8bit saves VRAM vs adamw_torch
 WEIGHT_DECAY = 0.01                       # L2 regularization
 LOGGING_STEPS = 10                        # Log every N steps
 EVAL_STEPS = 100                          # Evaluate every N steps
 SAVE_STEPS = 300                          # Checkpoint at end of run
-OUTPUT_DIR = "outputs_venv"                # Checkpoints and adapters
+OUTPUT_DIR = "outputs"                    # Checkpoints and adapters
 
 # Completion-only training — only compute loss on assistant response, not user/system tokens
-# This matches the approach from Jackrong/Qwopus3.5-9B-v3 (masked on assistant response)
 COMPLETION_ONLY = True                    # True = train only on assistant response
-RESPONSE_TEMPLATE = "<|im_start|>assistant\n"  # Token sequence that starts the assistant response
 
 # Inference test prompts
 TEST_PROMPTS = [
@@ -130,8 +128,11 @@ model = FastLanguageModel.get_peft_model(
     r=LORA_RANK,
     target_modules=LORA_TARGET_MODULES,
     lora_alpha=LORA_ALPHA,
+    lora_dropout=0,
+    bias="none",
     use_gradient_checkpointing="unsloth",
     random_state=3407,
+    max_seq_length=MAX_SEQ_LENGTH,
 )
 
 # Count trainable params
@@ -209,7 +210,7 @@ trainer = SFTTrainer(
         learning_rate=LEARNING_RATE,
         num_train_epochs=NUM_EPOCHS,
         max_steps=MAX_STEPS,
-        warmup_ratio=WARMUP_RATIO,
+        warmup_steps=WARMUP_STEPS,
         lr_scheduler_type=LR_SCHEDULER,
         optim=OPTIMIZER,
         weight_decay=WEIGHT_DECAY,
@@ -220,6 +221,8 @@ trainer = SFTTrainer(
         max_seq_length=MAX_SEQ_LENGTH,
         fp16=not torch.cuda.is_bf16_supported(),
         bf16=torch.cuda.is_bf16_supported(),
+        seed=3407,
+        dataset_num_proc=1,
         report_to="none",
         output_dir=OUTPUT_DIR,
     ),

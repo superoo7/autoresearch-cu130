@@ -1,7 +1,9 @@
 # Data & outputs
 datasets/
 outputs/
+outputs_venv/
 unsloth_compiled_cache/
+*.log
 
 # Python
 __pycache__/

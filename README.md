@@ -45,17 +45,26 @@ All datasets are unified into a single chat format with `<think>...</think>` tag
 ## Quick start
 
 ```bash
-# Start Docker container
-docker run -it --gpus=all --net=host --ipc=host \
-  --ulimit memlock=-1 --ulimit stack=67108864 \
-  -v $(pwd):$(pwd) -v $HOME/.cache/huggingface:/root/.cache/huggingface \
-  -w $(pwd) unsloth-dgx-spark
+# Create venv and install deps (one-time)
+uv venv .venv --python 3.12
+uv pip install --python .venv torch --exclude-newer-package 'torch=2027-01-01'
+uv pip install --python .venv torchvision --exclude-newer-package 'torchvision=2027-01-01'
+uv pip install --python .venv --no-deps \
+  "unsloth @ git+https://github.com/unslothai/unsloth" \
+  "unsloth_zoo @ git+https://github.com/unslothai/unsloth-zoo"
+uv pip install --python .venv \
+  "transformers>=5.2.0" "trl>=0.18.0" "peft>=0.15.0" "accelerate>=1.0.0" \
+  datasets bitsandbytes Pillow \
+  --exclude-newer-package 'bitsandbytes=2027-01-01'
+uv pip install --python .venv --no-build-isolation \
+  "flash-linear-attention @ git+https://github.com/fla-org/flash-linear-attention" \
+  "causal-conv1d @ git+https://github.com/Dao-AILab/causal-conv1d"
 
 # Prepare data (one-time, downloads from HuggingFace)
-python prepare.py
+.venv/bin/python prepare.py
 
 # Run a single training experiment
-python train.py 2>&1 | tee run.log
+.venv/bin/python train.py 2>&1 | tee run.log
 
 # Check results
 grep "^eval_loss:\|^checklist_score:" run.log
@@ -78,7 +87,7 @@ prepare.py      — dataset download + preparation (do not modify)
 train.py        — LoRA config, training, evaluation (agent modifies this)
 program.md      — agent instructions + experiment loop protocol
 references/     — eval-guide.md for writing good binary evals
-Dockerfile      — Docker image build (unsloth-dgx-spark)
+Dockerfile      — Docker image build (legacy, kept for reference)
 ```
 
 ## Hardware
