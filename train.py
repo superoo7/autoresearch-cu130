@@ -40,7 +40,7 @@ WEIGHT_DECAY = 0.01                       # L2 regularization
 LOGGING_STEPS = 10                        # Log every N steps
 EVAL_STEPS = 100                          # Evaluate every N steps
 SAVE_STEPS = 300                          # Checkpoint at end of run
-OUTPUT_DIR = "outputs"                    # Checkpoints and adapters
+OUTPUT_DIR = "outputs_venv"                # Checkpoints and adapters
 
 # Completion-only training — only compute loss on assistant response, not user/system tokens
 # This matches the approach from Jackrong/Qwopus3.5-9B-v3 (masked on assistant response)
@@ -120,6 +120,10 @@ model, tokenizer = FastLanguageModel.from_pretrained(
     full_finetuning=False,
 )
 
+# Unsloth 2026.3+ returns a Qwen3VLProcessor for Qwen3.5 models.
+# Extract the underlying text tokenizer for encode/decode operations.
+text_tokenizer = tokenizer.tokenizer if hasattr(tokenizer, "tokenizer") else tokenizer
+
 print("Applying LoRA...")
 model = FastLanguageModel.get_peft_model(
     model,
@@ -174,7 +178,7 @@ dataset = dataset.map(to_text, num_proc=1)
 # Filter by length
 if FILTER_BY_LENGTH:
     before = len(dataset)
-    dataset = dataset.filter(lambda x: len(tokenizer(x["text"]).input_ids) <= MAX_SEQ_LENGTH)
+    dataset = dataset.filter(lambda x: len(text_tokenizer.encode(x["text"])) <= MAX_SEQ_LENGTH)
     print(f"Filtered: {before} -> {len(dataset)} rows (dropped {before - len(dataset)})")
 
 # Train/eval split
@@ -190,24 +194,16 @@ print()
 
 print("Setting up trainer...")
 
-# Completion-only: only compute loss on the assistant response tokens
-data_collator = None
 if COMPLETION_ONLY:
-    from trl import DataCollatorForCompletionOnlyLM
-    response_token_ids = tokenizer.encode(RESPONSE_TEMPLATE, add_special_tokens=False)
-    data_collator = DataCollatorForCompletionOnlyLM(
-        response_template=response_token_ids,
-        tokenizer=tokenizer,
-    )
-    print(f"Completion-only training: masking loss before '{RESPONSE_TEMPLATE}'")
+    print(f"Completion-only training enabled via SFTConfig")
 
 trainer = SFTTrainer(
     model=model,
     processing_class=tokenizer,
     train_dataset=train_dataset,
     eval_dataset=eval_dataset,
-    data_collator=data_collator,
     args=SFTConfig(
+        completion_only_loss=COMPLETION_ONLY,
         per_device_train_batch_size=BATCH_SIZE,
         gradient_accumulation_steps=GRADIENT_ACCUMULATION,
         learning_rate=LEARNING_RATE,
@@ -240,7 +236,7 @@ print()
 
 print("Evaluating...")
 eval_results = trainer.evaluate()
-eval_loss = eval_results["eval_loss"]
+eval_loss = float(eval_results["eval_loss"])
 perplexity = math.exp(eval_loss)
 
 peak_vram_mb = torch.cuda.max_memory_allocated() / 1024 / 1024
@@ -262,8 +258,9 @@ for i, prompt in enumerate(TEST_PROMPTS):
         [{"role": "user", "content": prompt}],
         tokenize=False,
         add_generation_prompt=True,
+        enable_thinking=True,
     )
-    inputs = tokenizer(text, return_tensors="pt").to("cuda")
+    inputs = text_tokenizer(text, return_tensors="pt").to("cuda")
     with torch.no_grad():
         output = model.generate(
             **inputs,
@@ -271,7 +268,7 @@ for i, prompt in enumerate(TEST_PROMPTS):
             temperature=TEMPERATURE,
             do_sample=True,
         )
-    response = tokenizer.decode(output[0][inputs.input_ids.shape[1]:], skip_special_tokens=True)
+    response = text_tokenizer.decode(output[0][inputs.input_ids.shape[1]:], skip_special_tokens=False)
     responses.append(response)
     print(f"\n--- Prompt {i+1}: {prompt}")
     print(f"--- Response:\n{response[:1000]}")

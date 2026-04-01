@@ -23,9 +23,49 @@ RUN git clone -b v0.0.33 --depth=1 https://github.com/facebookresearch/xformers 
     python setup.py install && \
     cd ..
 
-# Install unsloth and dependencies (latest versions for Qwen3.5 support)
-RUN pip install --no-deps bitsandbytes==0.48.0
-RUN pip install --upgrade --force-reinstall --no-cache-dir unsloth unsloth_zoo
+# Install unsloth and deps for Qwen3.5 (transformers 5.x)
+# --no-deps on unsloth to preserve CUDA torch
+RUN pip install --no-deps bitsandbytes==0.48.0 && \
+    pip install "transformers>=5.2.0" "trl>=0.18.0" "peft>=0.15.0" "accelerate>=1.0.0" datasets && \
+    pip install --no-cache-dir --no-deps \
+        "unsloth_zoo[base] @ git+https://github.com/unslothai/unsloth-zoo" \
+        "unsloth[base] @ git+https://github.com/unslothai/unsloth"
+# Patch: unsloth exec()s transformers config source code in globals().
+# transformers 5.x configs use new symbols (auto_docstring, strict, etc.)
+# that aren't in unsloth's globals. Inject all needed imports.
+RUN python3 << 'PATCH'
+import glob
+files = glob.glob("/usr/local/lib/**/unsloth/models/_utils.py", recursive=True)
+if not files:
+    print("WARNING: _utils.py not found")
+else:
+    path = files[0]
+    with open(path) as f:
+        code = f.read()
+    # Inject imports for all symbols that transformers 5.x config classes need
+    patch = """
+# --- Patch for transformers 5.x compatibility ---
+try:
+    from transformers.utils import auto_docstring
+except ImportError:
+    auto_docstring = lambda *a, **k: (lambda f: f)
+try:
+    from huggingface_hub.dataclasses import strict
+except ImportError:
+    try:
+        from dataclasses import dataclass as strict
+    except:
+        strict = lambda *a, **k: (lambda f: f)
+# --- End patch ---
+"""
+    if "# --- Patch for transformers 5.x" not in code:
+        code = code.replace("import inspect\n", "import inspect\n" + patch, 1)
+        with open(path, "w") as f:
+            f.write(code)
+        print(f"Patched {path}")
+    else:
+        print("Already patched")
+PATCH
 
 # Launch the shell
 CMD ["/bin/bash"]
