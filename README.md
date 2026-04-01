@@ -30,13 +30,15 @@ The agent keeps a change only if eval_loss improved **AND** checklist score stay
 
 ## Dataset
 
-Dataset pulled from [Jackrong/Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled](https://huggingface.co/Jackrong/Qwen3.5-27B-Claude-4.6-Opus-Reasoning-Distilled). 3,209 high-quality reasoning distillation examples from 3 sources:
+16,390 high-quality reasoning distillation examples from 5 sources:
 
 | Dataset | Rows | Purpose |
 |---|---|---|
-| [nohurry/Opus-4.6-Reasoning-3000x-filtered](https://huggingface.co/datasets/nohurry/Opus-4.6-Reasoning-3000x-filtered) | 2,326 | Comprehensive Claude 4.6 Opus reasoning trajectories |
+| [nohurry/Opus-4.6-Reasoning-3000x-filtered](https://huggingface.co/datasets/nohurry/Opus-4.6-Reasoning-3000x-filtered) | 2,326 | Claude 4.6 Opus reasoning trajectories |
 | [TeichAI/claude-4.5-opus-high-reasoning-250x](https://huggingface.co/datasets/TeichAI/claude-4.5-opus-high-reasoning-250x) | 250 | High-intensity structured reasoning instances |
-| [Jackrong/Qwen3.5-reasoning-700x](https://huggingface.co/datasets/Jackrong/Qwen3.5-reasoning-700x) | 633 | Curated samples for step-by-step problem solving and reasoning diversity |
+| [Jackrong/Qwen3.5-reasoning-700x](https://huggingface.co/datasets/Jackrong/Qwen3.5-reasoning-700x) | 633 | Step-by-step problem solving and reasoning diversity |
+| [Roman1111111/gemini-3.1-pro-hard-high-reasoning](https://huggingface.co/datasets/Roman1111111/gemini-3.1-pro-hard-high-reasoning) | 3,150 | Gemini 3.1 Pro hard/high reasoning across domains |
+| [Roman1111111/gemini-3-pro-10000x-hard-high-reasoning](https://huggingface.co/datasets/Roman1111111/gemini-3-pro-10000x-hard-high-reasoning) | 10,031 | Large-scale Gemini 3 Pro hard reasoning (astrophysics, math, CS, etc.) |
 
 All datasets are unified into a single chat format with `<think>...</think>` tags for chain-of-thought reasoning by `prepare.py`.
 

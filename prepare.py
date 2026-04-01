@@ -26,6 +26,8 @@ HF_DATASETS = {
     "Opus-4.6-Reasoning-3000x-filtered": "nohurry/Opus-4.6-Reasoning-3000x-filtered",
     "claude-4.5-opus-high-reasoning-250x": "TeichAI/claude-4.5-opus-high-reasoning-250x",
     "Qwen3.5-reasoning-700x": "Jackrong/Qwen3.5-reasoning-700x",
+    "gemini-3.1-pro-hard-high-reasoning": "Roman1111111/gemini-3.1-pro-hard-high-reasoning",
+    "gemini-3-pro-10000x-hard-high-reasoning": "Roman1111111/gemini-3-pro-10000x-hard-high-reasoning",
 }
 
 
@@ -98,6 +100,30 @@ def load_qwen():
     return Dataset.from_list(rows)
 
 
+def load_gemini(dirname):
+    """Gemini datasets: original_data/original_input (dict) + model_thoughts + model_response."""
+    ds = load_dataset(str(BASE / dirname))["train"]
+    rows = []
+    for r in ds:
+        # Both datasets use slightly different key names
+        orig = r.get("original_data") or r.get("original_input") or {}
+        problem = orig.get("text", "")
+        thinking = r.get("model_thoughts", "")
+        solution = r.get("model_response", "")
+        assistant_content = f"<think>\n{thinking}\n</think>\n\n{solution}"
+        rows.append({
+            "messages": [
+                {"role": "user", "content": problem},
+                {"role": "assistant", "content": assistant_content},
+            ],
+            "source": dirname,
+            "category": orig.get("domain", ""),
+            "difficulty": orig.get("difficulty", ""),
+        })
+    print(f"  {dirname}: {len(rows)} rows")
+    return Dataset.from_list(rows)
+
+
 def main():
     print("Step 1: Downloading datasets...")
     download_datasets()
@@ -106,14 +132,18 @@ def main():
     ds_opus = load_opus()
     ds_claude = load_claude()
     ds_qwen = load_qwen()
+    ds_gemini31 = load_gemini("gemini-3.1-pro-hard-high-reasoning")
+    ds_gemini3 = load_gemini("gemini-3-pro-10000x-hard-high-reasoning")
 
-    combined = concatenate_datasets([ds_opus, ds_claude, ds_qwen])
+    combined = concatenate_datasets([ds_opus, ds_claude, ds_qwen, ds_gemini31, ds_gemini3])
     combined = combined.shuffle(seed=42)
 
     print(f"\nCombined: {len(combined)} rows")
-    print(f"  opus-4.6:   {sum(1 for r in combined if r['source'] == 'opus-4.6')}")
-    print(f"  claude-4.5: {sum(1 for r in combined if r['source'] == 'claude-4.5-opus')}")
-    print(f"  qwen3.5:    {sum(1 for r in combined if r['source'] == 'qwen3.5')}")
+    sources = {}
+    for r in combined:
+        sources[r["source"]] = sources.get(r["source"], 0) + 1
+    for src, count in sorted(sources.items()):
+        print(f"  {src}: {count}")
 
     combined.save_to_disk(str(OUTPUT))
     print(f"\nDataset ready at: {OUTPUT}")
