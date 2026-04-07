@@ -1,23 +1,30 @@
-# Python-generated files
+# Data & outputs
+datasets/
+outputs/
+outputs_venv/
+unsloth_compiled_cache/
+*.log
+
+# Python
 __pycache__/
-*.py[oc]
-build/
-dist/
-wheels/
-*.egg-info
+*.pyc
+*.pyo
+
+# Jupyter
+.ipynb_checkpoints/
 
 # Virtual environments
-.venv
+.venv/
 worktrees/
-results/
-queue/
 
-# Agent prompt files (generated per-session by launchers)
-CLAUDE.md
-AGENTS.md
+# IDE
+.vscode/
 
-# Experimental code/artifacts
-dev/
+# OS
+.DS_Store
 
-# Results file
+# Benchmarks
+pinchbench/
+
+# Results (regenerated per run)
 results.tsv
